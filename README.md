@@ -3,6 +3,16 @@
 A lightweight Docker image that exposes a local container to the Internet using [Tailscale Funnel](https://tailscale.com/kb/1223/funnel).  
 No need for a public IP or router port-forwarding. SSL certificates are automatically issued by Tailscale.
 
+## Pull the image
+
+```bash
+# Get the latest version
+docker pull ghcr.io/emaori/ts-funnel-service:latest
+
+# Or pull a specific version
+docker pull ghcr.io/emaori/ts-funnel-service:1.0.0
+```
+
 ## Basic usage
 
 1. Sign up for free at [tailscale.com](https://tailscale.com/).
