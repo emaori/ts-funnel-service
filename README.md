@@ -1,4 +1,4 @@
-# Tailscale Funnel Service (Docker + Caddy)
+# Tailscale Funnel Service (Tailscale + Caddy)
 
 A lightweight Docker image that exposes a local container to the Internet using [Tailscale Funnel](https://tailscale.com/kb/1223/funnel).  
 No need for a public IP or router port-forwarding. SSL certificates are automatically issued by Tailscale.
