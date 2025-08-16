@@ -26,7 +26,7 @@ docker pull ghcr.io/emaori/ts-funnel-service:1.0.0
 4. Funnel is disabled by default. Check the container logs for the activation link.
 5. Access your service using your Tailscale domain:  
    `https://<host_name>.<tailscale_domain>.ts.net`
-6. On the first request, it may take some time for the SSL certificate to be issued. Refresh the page once it’s ready.
+6. On the first request, it may take some time for the SSL certificate to be issued. Refresh the page and it should work with the SSL certificate.
 
 ### Docker run command
 
