@@ -3,39 +3,64 @@ name: Docker (tags only)
 on:
   push:
     tags:
-      - '*'         # esegui su QUALSIASI tag (es. v1.2.3, 1.2.3, ecc.)
+      # Only semver-like tags (with or without the leading "v")
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 env:
   REGISTRY: ghcr.io
   # Imposta esplicitamente l'immagine (evita sorprese se il repo si chiama diversamente)
   IMAGE_NAME: emaori/ts-funnel-service
 
+# Never run two publishes of the same tag concurrently
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Guard job: the build job below runs only if this one says the tag
+  # points to a commit reachable from main.
+  check-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      on_main: ${{ steps.check.outputs.on_main }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # serve per verificare la relazione col branch main
+
+      - name: Check that the tag is on main
+        id: check
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Questo tag non punta a un commit presente in 'main'. Build saltata."
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check-tag
+    if: needs.check-tag.outputs.on_main == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # serve per verificare la relazione col branch main
-
-      - name: Ensure tag is on main
-        run: |
-          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/origin/main"; then
-            echo "::warning::Questo tag non punta a un commit presente in 'main'. Build saltata."
-            exit 0
-          fi
 
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
         with:
-          cosign-release: 'v2.2.4'
+          cosign-release: "v2.2.4"
+
+      # Required to build the arm64 variant on the amd64 runner
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
@@ -47,21 +72,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Estrae tag e label: aggiunge sia "latest" sia il nome del tag (github.ref_name)
+      # Semver tags: a push of v2.0.1 produces 2.0.1, 2.0, 2 and latest.
+      # "latest" is added automatically only for non-prerelease semver tags.
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
-            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

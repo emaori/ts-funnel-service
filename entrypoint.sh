@@ -1,92 +1,114 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+#
+# ts-funnel-service entrypoint (POSIX sh, busybox ash compatible)
+# Starts tailscaled (userspace networking) + Caddy and exposes a local
+# service via Tailscale Funnel.
+#
+set -eu
 
-log(){ echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
+readonly TAILSCALE_SOCKET="/var/run/tailscale/tailscaled.sock"
+readonly TAILSCALE_STATE="/var/lib/tailscale/tailscaled.state"
+readonly CADDY_CONFIG="/etc/caddy/Caddyfile"
+readonly CADDY_PORT=8080
+readonly SOCKET_TIMEOUT_SECONDS=30
+readonly CADDY_READY_TIMEOUT_SECONDS=10
+# Liveness polling (cheap: shell builtins only). Overridable via env.
+readonly WATCHDOG_INTERVAL_SECONDS="${WATCHDOG_INTERVAL_SECONDS:-30}"
+# Tailscale connectivity check (expensive: forks the tailscale CLI and
+# queries the daemon). Runs far less often. Set to 0 to disable.
+readonly STATUS_CHECK_INTERVAL_SECONDS="${STATUS_CHECK_INTERVAL_SECONDS:-300}"
 
-cleanup(){
-  log "Shutting down services..."
-  [[ -n "${CADDY_PID:-}" ]] && kill "$CADDY_PID" 2>/dev/null || true
-  [[ -n "${TAILSCALE_PID:-}" ]] && kill "$TAILSCALE_PID" 2>/dev/null || true
-  tailscaled --cleanup 2>/dev/null || true
-  exit 0
+TAILSCALED_PID=""
+CADDY_PID=""
+
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
 }
-trap cleanup SIGTERM SIGINT
 
-log "Starting Tailscale+Caddy container..."
+fatal() {
+    log "ERROR: $*"
+    exit 1
+}
 
-if [[ -z "${TAILSCALE_AUTHKEY:-}" ]]; then
-  log "ERROR: TAILSCALE_AUTHKEY environment variable is required"
-  exit 125
-fi
-if [[ -z "${TAILSCALE_HOSTNAME:-}" ]]; then
-  log "ERROR: TAILSCALE_HOSTNAME environment variable is required"
-  exit 125
-fi
-
-# Ensure dirs exist
-mkdir -p /var/lib/tailscale /var/run/tailscale
-
-log "Starting tailscaled daemon..."
-tailscaled --state=/var/lib/tailscale/tailscaled.state \
-           --socket=/var/run/tailscale/tailscaled.sock &
-TAILSCALE_PID=$!
-
-# Wait for tailscaled socket to be available
-log "Waiting for tailscaled socket to be available..."
-for i in {1..30}; do
-    if [ -S /var/run/tailscale/tailscaled.sock ]; then
-        break
+cleanup() {
+    log "Shutting down services..."
+    if [ -n "$CADDY_PID" ] && kill -0 "$CADDY_PID" 2>/dev/null; then
+        kill "$CADDY_PID" 2>/dev/null || true
+        wait "$CADDY_PID" 2>/dev/null || true
     fi
-    if [ $i -eq 30 ]; then
-        log "ERROR: tailscaled socket not available within 30 seconds"
-        exit 125
+    if [ -n "$TAILSCALED_PID" ] && kill -0 "$TAILSCALED_PID" 2>/dev/null; then
+        kill "$TAILSCALED_PID" 2>/dev/null || true
+        wait "$TAILSCALED_PID" 2>/dev/null || true
     fi
-    sleep 125
-done
-log "tailscaled socket is available"
+    # Note: no `tailscaled --cleanup` here: it only removes kernel-mode
+    # iptables rules and routes, which don't exist in userspace mode.
+    log "Shutdown complete"
+    exit 0
+}
+trap cleanup TERM INT
 
-log "Authenticating with Tailscale..."
-UP_ARGS=(--authkey="$TAILSCALE_AUTHKEY" --accept-routes --accept-dns=false)
-[[ -n "${TAILSCALE_HOSTNAME:-}" ]] && UP_ARGS+=(--hostname="$TAILSCALE_HOSTNAME")
-tailscale up "${UP_ARGS[@]}"
+require_env() {
+    name="$1"
+    eval "value=\${$name:-}"
+    [ -n "$value" ] || fatal "$name environment variable is required"
+}
 
-log "Tailscale up successful"
+start_tailscaled() {
+    log "Starting tailscaled daemon (userspace networking)..."
+    mkdir -p /var/lib/tailscale /var/run/tailscale
 
-tailscale serve --reset || true
-tailscale funnel off || true
+    tailscaled \
+        --state="$TAILSCALE_STATE" \
+        --socket="$TAILSCALE_SOCKET" \
+        --tun=userspace-networking &
+    TAILSCALED_PID=$!
 
-log "Tailscale reset and funnel off completed"
+    log "Waiting for tailscaled socket (timeout: ${SOCKET_TIMEOUT_SECONDS}s)..."
+    i=1
+    while [ "$i" -le "$SOCKET_TIMEOUT_SECONDS" ]; do
+        if [ -S "$TAILSCALE_SOCKET" ]; then
+            log "tailscaled socket is available"
+            return 0
+        fi
+        kill -0 "$TAILSCALED_PID" 2>/dev/null \
+            || fatal "tailscaled exited unexpectedly during startup"
+        sleep 1
+        i=$((i + 1))
+    done
+    fatal "tailscaled socket not available within ${SOCKET_TIMEOUT_SECONDS} seconds"
+}
 
-CADDY_CONFIG="/etc/caddy/Caddyfile"
+tailscale_up() {
+    log "Authenticating with Tailscale..."
+    tailscale up \
+        --authkey="$TAILSCALE_AUTHKEY" \
+        --hostname="$TAILSCALE_HOSTNAME" \
+        --accept-dns=false
+    log "Tailscale up successful"
 
-# Check if user wants to use custom Caddyfile or generate default
-if [[ "${USE_CUSTOM_CADDYFILE:-false}" == "true" ]]; then
-    log "USE_CUSTOM_CADDYFILE=true, using existing Caddyfile at $CADDY_CONFIG"
-    if [ ! -f "$CADDY_CONFIG" ]; then
-        log "ERROR: USE_CUSTOM_CADDYFILE=true but no Caddyfile found at $CADDY_CONFIG"
-        exit 125
+    # Start from a clean serve/funnel configuration
+    tailscale serve --reset 2>/dev/null || true
+    tailscale funnel off 2>/dev/null || true
+    log "Tailscale serve reset and funnel off completed"
+}
+
+generate_caddyfile() {
+    require_env SERVICE_NAME
+    require_env SERVICE_PORT
+
+    case "$SERVICE_PORT" in
+        '' | *[!0-9]*) fatal "SERVICE_PORT must be numeric, got: '$SERVICE_PORT'" ;;
+    esac
+    if [ "$SERVICE_PORT" -lt 1 ] || [ "$SERVICE_PORT" -gt 65535 ]; then
+        fatal "SERVICE_PORT must be a valid TCP port (1-65535), got: '$SERVICE_PORT'"
     fi
-else
-    log "Generating default Caddyfile (set USE_CUSTOM_CADDYFILE=true to use custom config)..."
-    
-    if [[ -z "${SERVICE_NAME:-}" ]]; then
-      log "ERROR: SERVICE_NAME environment variable is required"
-      exit 125
-    fi
-    if [[ -z "${SERVICE_PORT:-}" ]]; then
-      log "ERROR: SERVICE_PORT environment variable is required"
-      exit 125
-    fi
 
-    # Check if CORS headers should be added
-    CORS_HEADERS=""
-    if [[ "${ALLOW_ALL_ORIGIN:-}" == "true" ]]; then
-        log "ALLOW_ALL_ORIGIN is true, adding CORS headers"
-        CORS_HEADERS="
+    cors_headers=""
+    if [ "${ALLOW_ALL_ORIGIN:-false}" = "true" ]; then
+        log "ALLOW_ALL_ORIGIN=true, adding CORS headers"
+        cors_headers="
         header_down Access-Control-Allow-Origin *
         header_down Access-Control-Allow-Credentials true"
-    else
-        log "ALLOW_ALL_ORIGIN is not set to true, skipping CORS headers"
     fi
 
     cat > "$CADDY_CONFIG" << EOF
@@ -94,40 +116,104 @@ else
     auto_https off
 }
 
-:8080 {
-    reverse_proxy $SERVICE_NAME:$SERVICE_PORT {
+:${CADDY_PORT} {
+    reverse_proxy ${SERVICE_NAME}:${SERVICE_PORT} {
         header_up Host {http.request.host}
         header_up X-Forwarded-Proto {http.request.scheme}
-        header_up X-Forwarded-For {http.request.remote}$CORS_HEADERS
+        header_up X-Forwarded-For {http.request.remote}${cors_headers}
     }
 }
 EOF
-    log "Default Caddyfile created at $CADDY_CONFIG for $SERVICE_NAME:$SERVICE_PORT"
-fi
+    log "Default Caddyfile created at $CADDY_CONFIG for ${SERVICE_NAME}:${SERVICE_PORT}"
+}
 
-log "Starting Caddy..."
-caddy run --config "$CADDY_CONFIG" --adapter caddyfile &
-CADDY_PID=$!
+prepare_caddy_config() {
+    if [ "${USE_CUSTOM_CADDYFILE:-false}" = "true" ]; then
+        log "USE_CUSTOM_CADDYFILE=true, using existing Caddyfile at $CADDY_CONFIG"
+        [ -f "$CADDY_CONFIG" ] \
+            || fatal "USE_CUSTOM_CADDYFILE=true but no Caddyfile found at $CADDY_CONFIG"
+    else
+        log "Generating default Caddyfile (set USE_CUSTOM_CADDYFILE=true to use a custom config)..."
+        generate_caddyfile
+    fi
 
-sleep 2
-if ! curl -fsS http://127.0.0.1:8080 >/dev/null 2>&1; then
-  log "WARNING: Caddy may not be responding on port 8080"
-else
-  log "Caddy is running and responding on port 8080"
-fi
+    log "Validating Caddy configuration..."
+    caddy validate --config "$CADDY_CONFIG" --adapter caddyfile \
+        || fatal "Caddyfile validation failed"
+}
 
-# Configure Funnel directly to Caddy (public internet via *.ts.net)
-# Note: only 127.0.0.1 proxies are supported by Funnel.
-log "Enabling Tailscale Funnel on 443 to Caddy:8080..."
-tailscale funnel --bg --https=443 --set-path=/ http://127.0.0.1:8080
-log "Funnel enabled"
+start_caddy() {
+    log "Starting Caddy..."
+    caddy run --config "$CADDY_CONFIG" --adapter caddyfile &
+    CADDY_PID=$!
 
-log "Setup complete!"
+    # Wait until Caddy accepts TCP connections on its port. A successful
+    # connect means Caddy itself is up, regardless of upstream health.
+    i=1
+    while [ "$i" -le "$CADDY_READY_TIMEOUT_SECONDS" ]; do
+        if nc -z 127.0.0.1 "$CADDY_PORT" 2>/dev/null; then
+            log "Caddy is running and listening on port ${CADDY_PORT}"
+            return 0
+        fi
+        kill -0 "$CADDY_PID" 2>/dev/null \
+            || fatal "Caddy exited unexpectedly during startup"
+        sleep 1
+        i=$((i + 1))
+    done
+    log "WARNING: Caddy not listening on port ${CADDY_PORT} after ${CADDY_READY_TIMEOUT_SECONDS}s, continuing anyway"
+}
 
-# Simple watchdog
-while true; do
-  if ! kill -0 "$TAILSCALE_PID" 2>/dev/null; then log "ERROR: tailscaled died"; exit 125; fi
-  if ! kill -0 "$CADDY_PID" 2>/dev/null; then log "ERROR: Caddy died"; exit 125; fi
-  if ! tailscale status >/dev/null 2>&1; then log "WARNING: Tailscale connectivity issue detected"; fi
-  sleep 10
-done
+enable_funnel() {
+    # Funnel only supports proxying to 127.0.0.1
+    log "Enabling Tailscale Funnel on 443 -> 127.0.0.1:${CADDY_PORT}..."
+    tailscale funnel --bg --https=443 --set-path=/ "http://127.0.0.1:${CADDY_PORT}"
+    log "Funnel enabled"
+}
+
+watchdog() {
+    log "Setup complete!"
+
+    # Stagger the cycle across containers started at the same time, so that
+    # N containers on the same host don't all wake up in the same instant.
+    stagger=$(( $$ % WATCHDOG_INTERVAL_SECONDS ))
+    if [ "$stagger" -gt 0 ]; then
+        sleep "$stagger" &
+        wait $! || true
+    fi
+
+    since_status_check=0
+    while true; do
+        # Cheap liveness checks: kill -0 is a shell builtin, no fork.
+        kill -0 "$TAILSCALED_PID" 2>/dev/null || fatal "tailscaled died"
+        kill -0 "$CADDY_PID" 2>/dev/null || fatal "Caddy died"
+
+        # Expensive connectivity check (forks the tailscale CLI): only
+        # every STATUS_CHECK_INTERVAL_SECONDS, and only if enabled.
+        if [ "$STATUS_CHECK_INTERVAL_SECONDS" -gt 0 ] \
+            && [ "$since_status_check" -ge "$STATUS_CHECK_INTERVAL_SECONDS" ]; then
+            tailscale status >/dev/null 2>&1 \
+                || log "WARNING: Tailscale connectivity issue detected"
+            since_status_check=0
+        fi
+
+        # Sleep in background + wait so SIGTERM is handled immediately
+        sleep "$WATCHDOG_INTERVAL_SECONDS" &
+        wait $! || true
+        since_status_check=$((since_status_check + WATCHDOG_INTERVAL_SECONDS))
+    done
+}
+
+main() {
+    log "Starting Tailscale+Caddy container..."
+    require_env TAILSCALE_AUTHKEY
+    require_env TAILSCALE_HOSTNAME
+
+    start_tailscaled
+    tailscale_up
+    prepare_caddy_config
+    start_caddy
+    enable_funnel
+    watchdog
+}
+
+main "$@"
