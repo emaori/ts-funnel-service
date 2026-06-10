@@ -1,4 +1,8 @@
 # Tailscale Funnel Service (Tailscale + Caddy)
+[![Docker build](https://github.com/emaori/ts-funnel-service/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/emaori/ts-funnel-service/actions/workflows/docker-publish.yml)
+[![Latest release](https://img.shields.io/github/v/release/emaori/ts-funnel-service?sort=semver)](https://github.com/emaori/ts-funnel-service/releases)
+[![License: MIT](https://img.shields.io/github/license/emaori/ts-funnel-service)](LICENSE)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-ts--funnel--service-blue?logo=docker)](https://github.com/emaori/ts-funnel-service/pkgs/container/ts-funnel-service)
 
 A lightweight Docker image that exposes a local container to the Internet using [Tailscale Funnel](https://tailscale.com/kb/1223/funnel).  
 No need for a public IP or router port-forwarding. SSL certificates are automatically issued by Tailscale.
