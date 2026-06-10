@@ -41,7 +41,7 @@ docker run -d \
   -e TAILSCALE_HOSTNAME="myService" \
   -e SERVICE_PORT=<port of the container to expose> \
   -e SERVICE_NAME=<name of the container to expose> \
-  ghcr.io/emaori/ts-funnel-service:latest
+  ghcr.io/emaori/ts-funnel-service:2.0
 ```
 
 ### Docker Compose
@@ -60,12 +60,56 @@ services:
       SERVICE_NAME: "<name of the container to expose>"
 ```
 
-> **Upgrading from a previous version?**
-> - `--cap-add NET_ADMIN` and `--device /dev/net/tun` are no longer needed and can be removed from your configuration.
-> - The container now runs as the unprivileged user `tsfunnel` (UID/GID `1000`). If you reuse a volume or bind mount created by a previous (root-based) version of this image, fix its ownership once on the host:
->   ```bash
->   chown -R 1000:1000 <path of the mounted directory>
->   ```
+> Upgrading from a 1.x version? See [Migrating from v1.x](#migrating-from-v1x) below.
+
+## Migrating from v1.0.0
+
+Version 2.0.0 makes the image **rootless** and switches Tailscale to **userspace networking**. The functionality is the same, but a few things change in how you run the container.
+
+### 1. Remove capabilities and devices (recommended)
+
+`--cap-add NET_ADMIN` and `--device /dev/net/tun` are no longer needed. Remove them from your `docker run` commands and Compose files:
+
+```diff
+   docker run -d \
+     --name ts-funnel-myService \
+     --restart=always \
+     --hostname myService \
+-    --cap-add NET_ADMIN \
+-    --device /dev/net/tun \
+     -e TAILSCALE_AUTHKEY="tskey-auth-<...>" \
+     ...
+```
+
+The container will still start if you leave them in place, but they grant privileges that are no longer used.
+
+### 2. Fix ownership of existing volumes (required)
+
+The container now runs as the unprivileged user `tsfunnel` (UID/GID `1000`) instead of root. Any volume or bind mount created by a 1.x container is owned by root, and the new version **cannot write to it**: `tailscaled` will fail to open its state file at startup.
+
+Fix the ownership once on the host:
+
+```bash
+# Bind mount: chown the host directory
+chown -R 1000:1000 /opt/data/ts-funnel
+
+# Named volume: chown its content through a temporary container
+docker run --rm -v ts-funnel-state:/data alpine chown -R 1000:1000 /data
+```
+
+Alternatively, start fresh with a new volume: the container will simply re-authenticate and appear as a new node in your Tailscale dashboard (the old node can be deleted from there).
+
+### 3. Custom Caddyfile must be readable by UID 1000 (if applicable)
+
+If you mount a custom Caddyfile, make sure the file is readable by UID `1000` (e.g. `chmod 644`). A root-owned file with `600` permissions worked with 1.x but will fail now. Mounting it read-only (`:ro`) is recommended.
+
+### 4. Behavior changes to be aware of
+
+- The Caddy configuration is now validated at startup with `caddy validate`. An invalid custom Caddyfile makes the container exit immediately with a clear error, instead of starting with a silently broken proxy.
+- `--accept-routes` is no longer passed to `tailscale up`: this container only needs inbound Funnel traffic and outbound Docker-network traffic, so accepting tailnet routes was unnecessary (and is not usable in userspace networking mode anyway).
+- Two new optional environment variables control monitoring frequency: see [Monitoring intervals](#monitoring-intervals).
+
+Nothing changes in how the target service is reached: as before, the `ts-funnel-service` container and the target container must share a user-defined Docker network so that `SERVICE_NAME` can be resolved (see [Custom network](#custom-network)).
 
 ## Persisting the Tailscale identity
 
