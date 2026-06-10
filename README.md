@@ -60,7 +60,7 @@ services:
       SERVICE_NAME: "<name of the container to expose>"
 ```
 
-> Upgrading from a 1.x version? See [Migrating from v1.x](#migrating-from-v1x) below.
+> Upgrading from a 1.x version? See [Migrating from v1.x](#migrating-from-v100) below.
 
 ## Migrating from v1.0.0
 
