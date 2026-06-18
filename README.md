@@ -34,6 +34,8 @@ docker pull ghcr.io/emaori/ts-funnel-service:2.0.0
    `https://<host_name>.<tailscale_domain>.ts.net`
 6. On the first request, it may take some time for the SSL certificate to be issued. Refresh the page and it should work with the SSL certificate.
 
+The examples below mount a named volume on `/var/lib/tailscale`. This is what keeps your Tailscale node identity (and IP) stable across container re-creations, and it is **strongly recommended** — see [Persisting the Tailscale identity](#persisting-the-tailscale-identity) for the details.
+
 ### Docker run command
 
 ```bash
@@ -45,7 +47,8 @@ docker run -d \
   -e TAILSCALE_HOSTNAME="myService" \
   -e SERVICE_PORT=<port of the container to expose> \
   -e SERVICE_NAME=<name of the container to expose> \
-  ghcr.io/emaori/ts-funnel-service:2.0
+  -v ts-funnel-myservice-state:/var/lib/tailscale \
+  ghcr.io/emaori/ts-funnel-service:latest
 ```
 
 ### Docker Compose
@@ -62,7 +65,14 @@ services:
       TAILSCALE_HOSTNAME: "myService"
       SERVICE_PORT: "<port of the container to expose>"
       SERVICE_NAME: "<name of the container to expose>"
+    volumes:
+      - ts-funnel-myservice-state:/var/lib/tailscale
+
+volumes:
+  ts-funnel-myservice-state:
 ```
+
+Docker creates the named volume automatically on first start; you don't need to create it beforehand.
 
 > Upgrading from a 1.x version? See [Migrating from v1.x](#migrating-from-v100) below.
 
@@ -87,21 +97,26 @@ Version 2.0.0 makes the image **rootless** and switches Tailscale to **userspace
 
 The container will still start if you leave them in place, but they grant privileges that are no longer used.
 
-### 2. Fix ownership of existing volumes (required)
+### 2. Fix ownership of existing volumes (only if you persisted state in v1)
 
-The container now runs as the unprivileged user `tsfunnel` (UID/GID `1000`) instead of root. Any volume or bind mount created by a 1.x container is owned by root, and the new version **cannot write to it**: `tailscaled` will fail to open its state file at startup.
+**This step applies only if your 1.x container mounted a volume on `/var/lib/tailscale` to persist its state.** If you never mounted a volume, skip it: the new container starts from a clean state and simply re-authenticates.
 
-Fix the ownership once on the host:
+The reason is the change of user, not the volume itself. Version 1.x ran the container as **root** (UID `0`), so every file written to that volume is owned by root. Version 2.0.0 runs as the unprivileged user `tsfunnel` (UID/GID `1000`), which has no permission to write over root-owned files — so `tailscaled` fails to open its state file at startup.
+
+Fix the ownership once on the host. **Run only the command that matches the kind of volume you used in v1** (not both):
 
 ```bash
-# Bind mount: chown the host directory
+# If you used a BIND MOUNT, chown the host directory directly:
 chown -R 1000:1000 /opt/data/ts-funnel
 
-# Named volume: chown its content through a temporary container
-docker run --rm -v ts-funnel-state:/data alpine chown -R 1000:1000 /data
+# If you used a NAMED VOLUME, chown its content through a temporary container
+# (a named volume has no directly accessible host path):
+docker run --rm -v ts-funnel-myservice-state:/data alpine chown -R 1000:1000 /data
 ```
 
-Alternatively, start fresh with a new volume: the container will simply re-authenticate and appear as a new node in your Tailscale dashboard (the old node can be deleted from there).
+Both commands do the same thing — set the ownership of the persisted state to UID/GID `1000` — they only differ because a bind mount is a real host path while a named volume lives inside Docker's storage area and must be reached from inside a container.
+
+Alternatively, start fresh with a new volume: the container will re-authenticate and appear as a new node in your Tailscale dashboard (the old node can be deleted from there).
 
 ### 3. Custom Caddyfile must be readable by UID 1000 (if applicable)
 
@@ -117,38 +132,22 @@ Nothing changes in how the target service is reached: as before, the `ts-funnel-
 
 ## Persisting the Tailscale identity
 
-To keep the same Tailscale node identity (and IP) across container re-creations, mount a volume on `/var/lib/tailscale`:
+The `docker run` and Compose examples above already mount a **named volume** (`ts-funnel-myservice-state`) on `/var/lib/tailscale`. That mount is what keeps the same Tailscale node identity, and the same IP, every time the container is re-created. This section explains why a *named* volume specifically is needed.
 
-```yaml
-    volumes:
-      - ts-funnel-state:/var/lib/tailscale
-```
+The image declares `/var/lib/tailscale` as a `VOLUME`, so even if you pass no `-v` flag Docker still backs that path with a volume. The catch is that this auto-created volume is **anonymous**: it gets a random hash name and is not reliably reattached when the container is re-created. As soon as you recreate the container (e.g. `docker rm` + `docker run`, or pulling a new image), a fresh empty volume is used, Tailscale generates a **brand-new identity**, and a new node — with a new IP — shows up in your dashboard.
 
-Or with `docker run`:
+A **named volume** avoids this: it has a stable name that you control, and Docker reattaches the very same volume to the recreated container, so the stored Tailscale state — and therefore the node identity — survives. This is why all the examples use a named volume rather than relying on the automatic one.
 
-```bash
-docker run -d \
-  --name ts-funnel-myService \
-  --restart=always \
-  --hostname myService \
-  -e TAILSCALE_AUTHKEY="tskey-auth-<...>" \
-  -e TAILSCALE_HOSTNAME="myService" \
-  -e SERVICE_PORT=<port of the container to expose> \
-  -e SERVICE_NAME=<name of the container to expose> \
-  -v ts-funnel-state:/var/lib/tailscale \
-  ghcr.io/emaori/ts-funnel-service:latest
-```
+If you run multiple `ts-funnel-service` containers on the same host, give each one a **distinct** volume name (e.g. `ts-funnel-grafana-state`, `ts-funnel-blog-state`): every container is a separate Tailscale node with its own identity, so they must not share the same state volume.
 
-Docker creates the named volume automatically on first start. If you run multiple `ts-funnel-service` containers on the same host, use a distinct volume name for each one (e.g. `ts-funnel-grafana-state`, `ts-funnel-blog-state`): every container is a separate Tailscale node with its own identity.
-
-With a **named volume** (recommended) no extra step is needed: Docker copies the correct ownership from the image. With a **bind mount**, the host directory must be writable by UID `1000`:
+With a **named volume** (recommended) no extra step is needed: Docker copies the correct ownership from the image. If you prefer a **bind mount**, the host directory must be writable by UID `1000`:
 
 ```bash
 mkdir -p /opt/data/ts-funnel/state
 chown 1000:1000 /opt/data/ts-funnel/state
 ```
 
-Alternatively, rebuild the image with `--build-arg UID=$(id -u) --build-arg GID=$(id -g)` to match your host user.
+Then mount it in place of the named volume, e.g. `-v /opt/data/ts-funnel/state:/var/lib/tailscale`. Alternatively, rebuild the image with `--build-arg UID=$(id -u) --build-arg GID=$(id -g)` to match your host user.
 
 ## Advanced usage
 
@@ -195,6 +194,7 @@ docker run -d \
   -e TAILSCALE_AUTHKEY="tskey-auth-<...>" \
   -e TAILSCALE_HOSTNAME='myService' \
   -e USE_CUSTOM_CADDYFILE=true \
+  -v ts-funnel-myservice-state:/var/lib/tailscale \
   -v /opt/data/ts-funnel/Caddyfile:/etc/caddy/Caddyfile:ro \
   ghcr.io/emaori/ts-funnel-service:latest
 ```
