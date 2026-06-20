@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Rome",
+  "schedule": ["before 6am on sunday"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Tailscale: only stable releases (even minor)",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["tailscale/tailscale"],
+      "allowedVersions": "/^v?\\d+\\.\\d*[02468]\\.\\d+$/"
+    }
+  ]
+}
