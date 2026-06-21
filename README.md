@@ -16,7 +16,7 @@ The image is **rootless** and runs Tailscale in [userspace networking](https://t
 docker pull ghcr.io/emaori/ts-funnel-service:latest
 
 # Or pull a specific version
-docker pull ghcr.io/emaori/ts-funnel-service:2.0.0
+docker pull ghcr.io/emaori/ts-funnel-service:2.1.0
 ```
 
 ## Basic usage
@@ -78,7 +78,7 @@ Docker creates the named volume automatically on first start; you don't need to 
 
 ## Migrating from v1.0.0
 
-Version 2.0.0 makes the image **rootless** and switches Tailscale to **userspace networking**. The functionality is the same, but a few things change in how you run the container.
+Version 2.x makes the image **rootless** and switches Tailscale to **userspace networking**. The functionality is the same, but a few things change in how you run the container.
 
 ### 1. Remove capabilities and devices (recommended)
 
@@ -101,7 +101,7 @@ The container will still start if you leave them in place, but they grant privil
 
 **This step applies only if your 1.x container mounted a volume on `/var/lib/tailscale` to persist its state.** If you never mounted a volume, skip it: the new container starts from a clean state and simply re-authenticates.
 
-The reason is the change of user, not the volume itself. Version 1.x ran the container as **root** (UID `0`), so every file written to that volume is owned by root. Version 2.0.0 runs as the unprivileged user `tsfunnel` (UID/GID `1000`), which has no permission to write over root-owned files — so `tailscaled` fails to open its state file at startup.
+The reason is the change of user, not the volume itself. Version 1.x ran the container as **root** (UID `0`), so every file written to that volume is owned by root. Version 2.x runs as the unprivileged user `tsfunnel` (UID/GID `1000`), which has no permission to write over root-owned files — so `tailscaled` fails to open its state file at startup.
 
 Fix the ownership once on the host. **Run only the command that matches the kind of volume you used in v1** (not both):
 
@@ -229,7 +229,7 @@ The image pins all its dependencies. Versions can be overridden at build time:
 
 | Name                | Description                                                        | Default   |
 | ------------------- | ------------------------------------------------------------------ | --------- |
-| `ALPINE_VERSION`    | Alpine base image version                                          | `3.23.4`  |
+| `ALPINE_VERSION`    | Alpine base image version                                          | `3.24.1`  |
 | `TAILSCALE_VERSION` | Tag of the official `tailscale/tailscale` image to copy binaries from | `v1.98.4` |
 | `CADDY_VERSION`     | Tag of the official `caddy` image to copy the binary from          | `2.11.4`  |
 | `UID` / `GID`       | UID/GID of the unprivileged `tsfunnel` user                        | `1000`    |
