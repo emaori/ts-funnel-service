@@ -4,7 +4,7 @@
 # Note: the tailscale/tailscale Docker image lags behind the GitHub client
 # releases. Pin to the newest *image* tag (same digest as :stable), not the
 # newest git tag. Check: https://hub.docker.com/r/tailscale/tailscale/tags
-ARG ALPINE_VERSION=3.23.4
+ARG ALPINE_VERSION=3.24.1
 ARG TAILSCALE_VERSION=v1.98.4
 ARG CADDY_VERSION=2.11.4
 
