@@ -24,6 +24,7 @@ FROM alpine:${ALPINE_VERSION}
 
 ARG TAILSCALE_VERSION
 ARG CADDY_VERSION
+ARG ALPINE_VERSION
 ARG UID=1000
 ARG GID=1000
 
@@ -65,4 +66,5 @@ LABEL org.opencontainers.image.source="https://github.com/emaori/ts-funnel-servi
       org.opencontainers.image.description="Docker image to expose a service using Tailscale Funnel" \
       org.opencontainers.image.licenses="MIT" \
       io.ts-funnel-service.tailscale.version="${TAILSCALE_VERSION}" \
-      io.ts-funnel-service.caddy.version="${CADDY_VERSION}"
+      io.ts-funnel-service.caddy.version="${CADDY_VERSION}" \
+      io.ts-funnel-service.alpine.version="${ALPINE_VERSION}"
