@@ -16,7 +16,7 @@ The image is **rootless** and runs Tailscale in [userspace networking](https://t
 docker pull ghcr.io/emaori/ts-funnel-service:latest
 
 # Or pull a specific version
-docker pull ghcr.io/emaori/ts-funnel-service:2.1.0
+docker pull ghcr.io/emaori/ts-funnel-service:2.2.0
 ```
 
 ## Basic usage
@@ -230,6 +230,6 @@ The image pins all its dependencies. Versions can be overridden at build time:
 | Name                | Description                                                        | Default   |
 | ------------------- | ------------------------------------------------------------------ | --------- |
 | `ALPINE_VERSION`    | Alpine base image version                                          | `3.24.1`  |
-| `TAILSCALE_VERSION` | Tag of the official `tailscale/tailscale` image to copy binaries from | `v1.98.4` |
+| `TAILSCALE_VERSION` | Tag of the official `tailscale/tailscale` image to copy binaries from | `v1.98.8` |
 | `CADDY_VERSION`     | Tag of the official `caddy` image to copy the binary from          | `2.11.4`  |
 | `UID` / `GID`       | UID/GID of the unprivileged `tsfunnel` user                        | `1000`    |
