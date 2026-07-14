@@ -22,6 +22,8 @@ jobs:
   # points to a commit reachable from main.
   check-tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       on_main: ${{ steps.check.outputs.on_main }}
     steps:
