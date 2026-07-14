@@ -203,8 +203,18 @@ docker run -d \
 
 ### Origin not allowed
 
-Some services (like Grafana) may reject requests from unknown domains, resulting in an **"origin not allowed"** error.  
-To bypass this restriction, you can set the environment variable `ALLOW_ALL_ORIGIN` to `true`.
+Some services (like Grafana) may reject requests from unknown domains, resulting in an **"origin not allowed"** error.
+
+Set `CORS_ALLOW_ORIGIN` to control which browser origin is allowed to make cross-origin requests:
+
+| Value | Effect |
+|---|---|
+| `https://my.domain.com` | Adds `Access-Control-Allow-Origin: https://my.domain.com` and `Access-Control-Allow-Credentials: true`. Cookies and auth headers are forwarded. Use this when embedding the service in a specific trusted site. |
+| `*` | Adds `Access-Control-Allow-Origin: *`. Any browser origin can read responses, but cookies and auth headers are **not** forwarded (browsers refuse credentials with a wildcard origin). |
+
+> ⚠️ **Security note**: CORS headers are added to every response. With a specific origin (`https://my.domain.com`), credentials work correctly but only that origin can make cross-origin requests. With `*`, any website can read responses — enable it only when the exposed service has its own authentication or the data is intentionally public.
+
+`ALLOW_ALL_ORIGIN=true` is kept for backwards compatibility and behaves identically to `CORS_ALLOW_ORIGIN=*`. If both are set, `CORS_ALLOW_ORIGIN` takes precedence.
 
 ### Monitoring intervals
 
@@ -219,7 +229,8 @@ The entrypoint includes a lightweight watchdog: it checks every `WATCHDOG_INTERV
 | `SERVICE_PORT`                  | Port of the local container to expose (1-65535)                              | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |
 | `SERVICE_NAME`                  | Name (or IP address) of the local container to expose                        | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |
 | `USE_CUSTOM_CADDYFILE`          | Set to `true` to provide a custom Caddyfile (⚠️ advanced usage)              | No        | `false` |
-| `ALLOW_ALL_ORIGIN`              | Set to `true` to bypass "origin not allowed" errors for some services         | No        | `false` |
+| `CORS_ALLOW_ORIGIN`             | Allowed CORS origin: a specific origin (e.g. `https://my.domain.com`) or `*` for all origins (see [Origin not allowed](#origin-not-allowed)) | No | — |
+| `ALLOW_ALL_ORIGIN`              | Deprecated alias for `CORS_ALLOW_ORIGIN=*` (kept for backwards compatibility)               | No | `false` |
 | `WATCHDOG_INTERVAL_SECONDS`     | How often the watchdog checks that `tailscaled` and Caddy are alive          | No        | `30`    |
 | `STATUS_CHECK_INTERVAL_SECONDS` | How often Tailscale connectivity is verified (logs a warning); `0` disables it | No        | `300`   |
 

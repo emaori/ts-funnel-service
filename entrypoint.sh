@@ -104,11 +104,25 @@ generate_caddyfile() {
     fi
 
     cors_headers=""
-    if [ "${ALLOW_ALL_ORIGIN:-false}" = "true" ]; then
-        log "ALLOW_ALL_ORIGIN=true, adding CORS headers"
-        cors_headers="
-        header_down Access-Control-Allow-Origin *
+    cors_origin="${CORS_ALLOW_ORIGIN:-}"
+
+    # Backwards-compat: ALLOW_ALL_ORIGIN=true is an alias for CORS_ALLOW_ORIGIN=*
+    if [ -z "$cors_origin" ] && [ "${ALLOW_ALL_ORIGIN:-false}" = "true" ]; then
+        cors_origin="*"
+    fi
+
+    if [ -n "$cors_origin" ]; then
+        if [ "$cors_origin" = "*" ]; then
+            log "CORS: Access-Control-Allow-Origin: * — any browser origin can read responses."
+            log "WARNING: cookies and auth headers are NOT forwarded by browsers to wildcard origins."
+            cors_headers="
+        header_down Access-Control-Allow-Origin *"
+        else
+            log "CORS: Access-Control-Allow-Origin: ${cors_origin} (credentials allowed)."
+            cors_headers="
+        header_down Access-Control-Allow-Origin ${cors_origin}
         header_down Access-Control-Allow-Credentials true"
+        fi
     fi
 
     cat > "$CADDY_CONFIG" << EOF
