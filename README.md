@@ -151,6 +151,94 @@ Then mount it in place of the named volume, e.g. `-v /opt/data/ts-funnel/state:/
 
 ## Advanced usage
 
+### Docker Secrets (auth key)
+
+By default the Tailscale auth key is passed via the `TAILSCALE_AUTHKEY` environment variable. Environment variables are visible in `docker inspect` and in the process environment inside the container. As an alternative, you can supply the key as a **Docker Secret**, which mounts it as a read-only file at `/run/secrets/tailscale_authkey` — keeping it out of the process environment entirely. When the secret file is present, `TAILSCALE_AUTHKEY` is not needed.
+
+#### `docker run`
+
+Store the key in a file on the host and pass it with `--secret`:
+
+```bash
+# Write the key to a root-owned file
+echo "tskey-auth-<...>" | sudo tee /etc/docker/secrets/ts_authkey > /dev/null
+sudo chmod 600 /etc/docker/secrets/ts_authkey
+
+docker run -d \
+  --name ts-funnel-myService \
+  --restart=always \
+  --hostname myService \
+  --secret source=/etc/docker/secrets/ts_authkey,target=tailscale_authkey \
+  -e TAILSCALE_HOSTNAME="myService" \
+  -e SERVICE_PORT=<port of the container to expose> \
+  -e SERVICE_NAME=<name of the container to expose> \
+  -v ts-funnel-myservice-state:/var/lib/tailscale \
+  ghcr.io/emaori/ts-funnel-service:latest
+```
+
+#### Docker Compose (standalone)
+
+```yaml
+services:
+  ts-funnel-myService:
+    image: ghcr.io/emaori/ts-funnel-service:latest
+    container_name: ts-funnel-myService
+    restart: always
+    hostname: myService
+    environment:
+      TAILSCALE_HOSTNAME: "myService"
+      SERVICE_PORT: "<port of the container to expose>"
+      SERVICE_NAME: "<name of the container to expose>"
+    secrets:
+      - tailscale_authkey
+    volumes:
+      - ts-funnel-myservice-state:/var/lib/tailscale
+
+secrets:
+  tailscale_authkey:
+    file: /etc/docker/secrets/ts_authkey   # path to the key file on the host
+
+volumes:
+  ts-funnel-myservice-state:
+```
+
+> **Note**: in standalone Compose (without Docker Swarm), secrets are bind-mounted from the specified host file — Docker does not encrypt them. The security benefit over an environment variable is that the key does not appear in `docker inspect` or the process environment. If you need encryption at rest, use Docker Swarm (see below).
+
+#### Docker Swarm
+
+In Swarm mode the secret is stored encrypted in the cluster's Raft log and is never written to disk on worker nodes in plaintext:
+
+```bash
+# Create the secret once in the Swarm
+echo "tskey-auth-<...>" | docker secret create tailscale_authkey -
+
+# Deploy
+docker stack deploy -c stack.yml ts-funnel
+```
+
+```yaml
+# stack.yml
+services:
+  ts-funnel-myService:
+    image: ghcr.io/emaori/ts-funnel-service:latest
+    hostname: myService
+    environment:
+      TAILSCALE_HOSTNAME: "myService"
+      SERVICE_PORT: "<port of the container to expose>"
+      SERVICE_NAME: "<name of the container to expose>"
+    secrets:
+      - tailscale_authkey
+    volumes:
+      - ts-funnel-myservice-state:/var/lib/tailscale
+
+secrets:
+  tailscale_authkey:
+    external: true   # already created via `docker secret create`
+
+volumes:
+  ts-funnel-myservice-state:
+```
+
 ### Custom network
 
 You can create a dedicated Docker network only for the service container and the `ts-funnel-service` container:
@@ -224,7 +312,7 @@ The entrypoint includes a lightweight watchdog: it checks every `WATCHDOG_INTERV
 
 | Name                            | Description                                                                  | Mandatory | Default |
 | ------------------------------- | ---------------------------------------------------------------------------- | --------- | ------- |
-| `TAILSCALE_AUTHKEY`             | Tailscale authorization key                                                  | Yes       | —       |
+| `TAILSCALE_AUTHKEY`             | Tailscale authorization key. Not required if the `tailscale_authkey` Docker Secret is mounted (see [Docker Secrets](#docker-secrets-auth-key)) | Yes (unless using Docker Secrets) | — |
 | `TAILSCALE_HOSTNAME`            | Hostname used to configure the Tailscale connection                          | Yes       | —       |
 | `SERVICE_PORT`                  | Port of the local container to expose (1-65535)                              | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |
 | `SERVICE_NAME`                  | Name (or IP address) of the local container to expose                        | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |

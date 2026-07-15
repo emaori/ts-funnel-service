@@ -8,6 +8,7 @@ set -eu
 
 readonly TAILSCALE_SOCKET="/var/run/tailscale/tailscaled.sock"
 readonly TAILSCALE_STATE="/var/lib/tailscale/tailscaled.state"
+readonly TAILSCALE_AUTHKEY_SECRET="/run/secrets/tailscale_authkey"
 readonly CADDY_CONFIG="/etc/caddy/Caddyfile"
 readonly CADDY_PORT=8080
 readonly SOCKET_TIMEOUT_SECONDS=30
@@ -80,10 +81,19 @@ start_tailscaled() {
 
 tailscale_up() {
     log "Authenticating with Tailscale..."
-    tailscale up \
-        --authkey="$TAILSCALE_AUTHKEY" \
-        --hostname="$TAILSCALE_HOSTNAME" \
-        --accept-dns=false
+    if [ -f "$TAILSCALE_AUTHKEY_SECRET" ]; then
+        log "Using Tailscale auth key from Docker secret"
+        tailscale up \
+            --authkey="file:${TAILSCALE_AUTHKEY_SECRET}" \
+            --hostname="$TAILSCALE_HOSTNAME" \
+            --accept-dns=false
+    else
+        log "Using Tailscale auth key from environment variable"
+        tailscale up \
+            --authkey="$TAILSCALE_AUTHKEY" \
+            --hostname="$TAILSCALE_HOSTNAME" \
+            --accept-dns=false
+    fi
     log "Tailscale up successful"
 
     # Start from a clean serve/funnel configuration
@@ -219,7 +229,11 @@ watchdog() {
 
 main() {
     log "Starting Tailscale+Caddy container..."
-    require_env TAILSCALE_AUTHKEY
+    if [ -f "$TAILSCALE_AUTHKEY_SECRET" ]; then
+        log "Tailscale auth key: Docker secret found at $TAILSCALE_AUTHKEY_SECRET"
+    else
+        require_env TAILSCALE_AUTHKEY
+    fi
     require_env TAILSCALE_HOSTNAME
 
     start_tailscaled
