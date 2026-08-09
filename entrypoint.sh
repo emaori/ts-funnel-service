@@ -114,13 +114,33 @@ generate_caddyfile() {
     cat > "$CADDY_CONFIG" << EOF
 {
     auto_https off
+    servers {
+        # tailscaled terminates the Funnel TLS and proxies to Caddy over
+        # loopback, so the loopback hop is a trusted proxy. Declaring it lets
+        # Caddy resolve {client_ip} from the X-Forwarded-For that Tailscale
+        # sets, instead of reporting 127.0.0.1. Keep this list limited to
+        # loopback: Funnel replaces X-Forwarded-For rather than appending to
+        # it, so a client cannot inject a forged hop.
+        trusted_proxies static 127.0.0.1 ::1
+    }
 }
 
 :${CADDY_PORT} {
+    log {
+        output stdout
+        format console
+    }
+
     reverse_proxy ${SERVICE_NAME}:${SERVICE_PORT} {
         header_up Host {http.request.host}
+        # Send the resolved public client IP as a SINGLE value.
+        # {http.request.remote} is always 127.0.0.1 here and destroys
+        # attribution; letting Caddy append its own hop instead yields
+        # "<real-ip>, 127.0.0.1", and upstreams that read the rightmost
+        # entry (e.g. Quarkus-based ones) would still see 127.0.0.1.
         header_up X-Forwarded-Proto {http.request.scheme}
-        header_up X-Forwarded-For {http.request.remote}${cors_headers}
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}${cors_headers}
     }
 }
 EOF

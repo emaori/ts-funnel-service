@@ -173,16 +173,37 @@ By default, it automatically generates a Caddyfile like this:
 ```bash
 {
     auto_https off
+    servers {
+        trusted_proxies static 127.0.0.1 ::1
+    }
 }
 
 :8080 {
+    log {
+        output stdout
+        format console
+    }
+
     reverse_proxy $SERVICE_NAME:$SERVICE_PORT {
         header_up Host {http.request.host}
         header_up X-Forwarded-Proto {http.request.scheme}
-        header_up X-Forwarded-For {http.request.remote}
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}
     }
 }
 ```
+
+#### Client IP preservation (since 2.3.0)
+
+⚠️ This applies **only to the generated Caddyfile**. With `USE_CUSTOM_CADDYFILE=true` nothing is generated and preserving the client IP is entirely up to you.
+
+Tailscale Funnel terminates TLS in `tailscaled` and proxies to Caddy over loopback, so `{http.request.remote}` is always `127.0.0.1`. Up to 2.2.x the generated Caddyfile forwarded that value as `X-Forwarded-For`, which overwrote the real public client IP that Tailscale had already put in the header — every downstream log (reverse proxies, auth proxies, the application itself) recorded `127.0.0.1` for every request.
+
+Starting from **2.3.0** the generated Caddyfile declares loopback as a trusted proxy and forwards the resolved `{client_ip}` as a **single** value. Emitting one unambiguous value matters because upstreams disagree on which end of the list to read: simply dropping the override makes Caddy append its own hop (`<real-ip>, 127.0.0.1`), and upstreams that read the rightmost entry still see `127.0.0.1`. Access logging is also enabled, so the container itself now has an HTTP request record.
+
+This is not spoofable: Tailscale Funnel **replaces** `X-Forwarded-For` instead of appending to it, so a client cannot inject a false hop. Keep `trusted_proxies` limited to loopback for that to hold.
+
+If you provide your own Caddyfile and want the same behavior, add the global `trusted_proxies` block and use `header_up X-Forwarded-For {client_ip}`; otherwise your upstreams keep seeing `127.0.0.1`.
 
 To provide a custom Caddyfile, set the environment variable `USE_CUSTOM_CADDYFILE` to `true` and mount your own file:
 
