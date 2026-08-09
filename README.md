@@ -16,7 +16,7 @@ The image is **rootless** and runs Tailscale in [userspace networking](https://t
 docker pull ghcr.io/emaori/ts-funnel-service:latest
 
 # Or pull a specific version
-docker pull ghcr.io/emaori/ts-funnel-service:2.2.0
+docker pull ghcr.io/emaori/ts-funnel-service:2.3.0
 ```
 
 ## Basic usage
