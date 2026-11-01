@@ -5,7 +5,7 @@
 # releases. Pin to the newest *image* tag (same digest as :stable), not the
 # newest git tag. Check: https://hub.docker.com/r/tailscale/tailscale/tags
 ARG ALPINE_VERSION=3.24.2
-ARG TAILSCALE_VERSION=v1.104.1
+ARG TAILSCALE_VERSION=v1.104.4
 ARG CADDY_VERSION=2.11.4
 
 # --- Source stages: official images, used only to copy the static binaries ---
