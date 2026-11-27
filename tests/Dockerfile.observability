@@ -1,0 +1,11 @@
+FROM golang:1.27.4-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY internal ./internal
+COPY tests/fixtures ./tests/fixtures
+RUN CGO_ENABLED=0 go build -trimpath -o /out/fixtures ./tests/fixtures
+FROM alpine:3.24.2
+COPY --from=build /out/fixtures /usr/local/bin/fixtures
+USER 1000:1000
+ENTRYPOINT ["/usr/local/bin/fixtures"]

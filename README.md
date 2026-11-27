@@ -9,6 +9,19 @@ No need for a public IP or router port-forwarding. SSL certificates are automati
 
 The image is **rootless** and runs Tailscale in [userspace networking](https://tailscale.com/kb/1112/userspace-networking) mode: no `NET_ADMIN` capability, no `/dev/net/tun` device, and no root user are required. It also works out of the box on rootless Docker and Podman.
 
+## Automatic updates and monitoring
+
+Tailscale updates automatically by default inside the running container. The supervisor verifies signed stable artifacts, stages the inactive A/B slot and briefly restarts Tailscale while Caddy and metrics stay running. Failed handovers attempt rollback to the outgoing executable and untouched state. Existing public connections may be lost.
+
+Set `TAILSCALE_AUTO_UPDATE_ENABLED: "false"` at container creation to opt out. Keep a distinct persistent state volume per service to retain identity, committed runtime binaries, recovery records and results. Runtime Tailscale can advance beyond the baked-in image version.
+
+- [Switch, rollback, settings, logs and migration](docs/automatic-updates.md)
+- [Shared Grafana dashboard JSON](docs/grafana/ts-funnel-service.json) and [multi-service monitoring setup](docs/monitoring.md)
+- [Validation and authenticated rollout test plan](docs/testing.md)
+- [Release notes](CHANGELOG.md)
+
+Update details appear in `docker logs` and `/var/lib/tailscale/updater/logs/updates.log`. Override `UPDATE_LOG_DIR` to mount a separate folder. `/metrics` listens on the internal container network at port 9090; no host port needs publishing. Prometheus/Grafana are optional external consumers.
+
 ## Pull the image
 
 ```bash
@@ -29,7 +42,7 @@ docker pull ghcr.io/emaori/ts-funnel-service:2.4.0
    4. Generate the install script
    5. Copy the key from the script
 3. Create a container using `docker run` or Docker Compose (see below).
-4. Funnel is disabled by default. Check the container logs for the activation link.
+4. Authorize Funnel in the tailnet policy if needed. Check logs for the activation link; the supervisor enables the configured background forwarding.
 5. Access your service using your Tailscale domain:  
    `https://<host_name>.<tailscale_domain>.ts.net`
 6. On the first request, it may take some time for the SSL certificate to be issued. Refresh the page and it should work with the SSL certificate.
@@ -229,13 +242,15 @@ To bypass this restriction, you can set the environment variable `ALLOW_ALL_ORIG
 
 ### Monitoring intervals
 
-The entrypoint includes a lightweight watchdog: it checks every `WATCHDOG_INTERVAL_SECONDS` that both `tailscaled` and Caddy are alive (a free, fork-less check) and exits if either died, so that Docker can restart the container. Much less frequently, every `STATUS_CHECK_INTERVAL_SECONDS`, it also verifies Tailscale connectivity and logs a warning if it is degraded. Cycles are automatically staggered across containers, so many instances on the same host don't wake up at the same time. The defaults are fine for most setups; tune them only if you need faster failure detection or even lower idle activity.
+The Go supervisor checks child liveness every `WATCHDOG_INTERVAL_SECONDS` (default 30). Unexpected death exits the container so a configured Docker restart policy can restart it. Planned Tailscale stops belong to the updater and do not trigger the watchdog. Failed rollback keeps telemetry running, halts updates and reports unhealthy.
+
+Every `STATUS_CHECK_INTERVAL_SECONDS` (default 300), it refreshes cached local readiness and public HTTPS observations and warns on degraded connectivity. Set `0` to disable periodic observations. Release metadata checks use a separate six-hour jittered schedule.
 
 ## Environment variables
 
 | Name                            | Description                                                                  | Mandatory | Default |
 | ------------------------------- | ---------------------------------------------------------------------------- | --------- | ------- |
-| `TAILSCALE_AUTHKEY`             | Tailscale authorization key                                                  | Yes       | —       |
+| `TAILSCALE_AUTHKEY` | Tailscale authorization key; persisted-node restarts do not reuse it | Only for first enrollment | — |
 | `TAILSCALE_HOSTNAME`            | Hostname used to configure the Tailscale connection                          | Yes       | —       |
 | `SERVICE_PORT`                  | Port of the local container to expose (1-65535)                              | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |
 | `SERVICE_NAME`                  | Name (or IP address) of the local container to expose                        | Yes, unless `USE_CUSTOM_CADDYFILE` is `true` | — |
@@ -244,9 +259,12 @@ The entrypoint includes a lightweight watchdog: it checks every `WATCHDOG_INTERV
 | `WATCHDOG_INTERVAL_SECONDS`     | How often the watchdog checks that `tailscaled` and Caddy are alive          | No        | `30`    |
 | `STATUS_CHECK_INTERVAL_SECONDS` | How often Tailscale connectivity is verified (logs a warning); `0` disables it | No        | `300`   |
 
+The default-on updater and telemetry settings are listed in [automatic update settings](docs/automatic-updates.md#settings), including check/validation intervals, probe DNS/path, metrics address and log retention.
+
+
 ## Build arguments
 
-The image pins all its dependencies. Versions can be overridden at build time:
+The image pins its build dependencies. Runtime Tailscale can advance independently; image labels remain build provenance. Versions can be overridden at build time:
 
 | Name                | Description                                                        | Default   |
 | ------------------- | ------------------------------------------------------------------ | --------- |
@@ -254,3 +272,5 @@ The image pins all its dependencies. Versions can be overridden at build time:
 | `TAILSCALE_VERSION` | Tag of the official `tailscale/tailscale` image to copy binaries from | `v1.104.1` |
 | `CADDY_VERSION`     | Tag of the official `caddy` image to copy the binary from          | `2.11.4`  |
 | `UID` / `GID`       | UID/GID of the unprivileged `tsfunnel` user                        | `1000`    |
+| `GO_VERSION` | Builder-only Go toolchain | `1.27.4` |
+| `SERVICE_VERSION` | Supervisor build-info version; does not select Tailscale | `development` |

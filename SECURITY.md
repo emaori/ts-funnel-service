@@ -30,3 +30,24 @@ cosign verify \
 This image exposes a local service to the public Internet by design.
 Securing the *exposed service itself* (authentication, updates, hardening)
 is the user's responsibility.
+
+
+## Runtime updates and monitoring
+
+Automatic Tailscale updates are enabled by default. Runtime archives are
+authenticated using official signatures chained through signing keys to embedded
+upstream roots. Root trust changes require an image update. The updater remains
+unprivileged, without a Docker socket or package-manager elevation. Persisted
+executable hashes detect accidental modification; they cannot protect a state
+volume controlled by an attacker with write access.
+
+Image signatures and labels identify build provenance. The runtime version can
+advance beyond the seed. Use observed metrics for the active version, or set
+`TAILSCALE_AUTO_UPDATE_ENABLED=false` at creation for an explicit update policy.
+Opting out retains the committed runtime version without a downgrade.
+
+The unauthenticated `/metrics` listener belongs on a trusted container network,
+not the public Internet. No status/log API exists. State and optional log mounts
+must remain private and writable by the configured UID. See
+[automatic updates](docs/automatic-updates.md) and the
+[authenticated rollout validation plan](docs/testing.md) for recovery limits.

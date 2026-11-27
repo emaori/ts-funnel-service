@@ -1,0 +1,2603 @@
+{
+  "uid": "ts-funnel-services",
+  "title": "Tailscale Funnel Services",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "tags": [
+    "tailscale",
+    "ts-funnel",
+    "openmetrics"
+  ],
+  "description": "One shared fleet dashboard. Select a service in the overview for details. Full diagnostics remain in docker logs and updates.log.",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "job",
+        "label": "Job",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up, job)",
+        "query": {
+          "query": "label_values(up, job)",
+          "refId": "job"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": false,
+        "options": [],
+        "current": {
+          "text": "ts-funnel",
+          "value": [
+            "ts-funnel"
+          ]
+        }
+      },
+      {
+        "name": "environment",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{job=~\"$job\"}, environment)",
+        "query": {
+          "query": "label_values(up{job=~\"$job\"}, environment)",
+          "refId": "environment"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{job=~\"$job\",environment=~\"$environment\"}, host)",
+        "query": {
+          "query": "label_values(up{job=~\"$job\",environment=~\"$environment\"}, host)",
+          "refId": "host"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "service",
+        "label": "Inspect service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}, service_name)",
+        "query": {
+          "query": "label_values(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}, service_name)",
+          "refId": "service"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "options": [],
+        "current": {}
+      },
+      {
+        "name": "instance",
+        "label": "Instances",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\"}, instance)",
+        "query": {
+          "query": "label_values(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\"}, instance)",
+          "refId": "instance"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "component",
+        "label": "Component",
+        "type": "custom",
+        "query": "tailscale",
+        "current": {
+          "text": "tailscale",
+          "value": "tailscale"
+        },
+        "options": [
+          {
+            "text": "tailscale",
+            "value": "tailscale",
+            "selected": true
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Containers",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Metrics unreachable",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(1-up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Not locally ready",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count((ts_funnel_component_ready{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}==0) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}==1)) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Updating",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum((ts_funnel_update_in_progress{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Last update needs attention",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum((ts_funnel_update_last_result{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\",result=~\"failed|rolled_back|rollback_failed|interrupted\"}==1) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)) or vector(0)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "title": "All service containers — select a service for details",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "label_join(((((((max by (job,instance,environment,host,service_name) ((((2*(1-ts_funnel_component_ready{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"})*(1-ts_funnel_update_in_progress{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"})+ts_funnel_update_in_progress{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)) or on (job,instance,environment,host,service_name) (3+0*(up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}==0))) or on (job,instance,environment,host,service_name) (2*up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}))) * on (job,instance,environment,host,service_name) group_left(current_version) ((max by (job,instance,environment,host,service_name,current_version) (label_replace(((ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\",role=\"current\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"current_version\",\"$1\",\"version\",\"(.*)\"))) or on (job,instance,environment,host,service_name) (label_replace((up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}*0+1),\"current_version\",\"Unavailable\",\"instance\",\".*\")))) * on (job,instance,environment,host,service_name) group_left(previous_version) ((max by (job,instance,environment,host,service_name,previous_version) (label_replace(((ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\",role=\"previous\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"previous_version\",\"$1\",\"version\",\"(.*)\"))) or on (job,instance,environment,host,service_name) (label_replace((up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}*0+1),\"previous_version\",\"None\",\"instance\",\".*\")))) * on (job,instance,environment,host,service_name) group_left(last_result) ((max by (job,instance,environment,host,service_name,last_result) (label_replace(((ts_funnel_update_last_result{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}==1) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"last_result\",\"$1\",\"result\",\"(.*)\"))) or on (job,instance,environment,host,service_name) (label_replace((up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}*0+1),\"last_result\",\"Unknown\",\"instance\",\".*\")))) * on (job,instance,environment,host,service_name) group_left(update_phase) ((max by (job,instance,environment,host,service_name,update_phase) (label_replace(((ts_funnel_update_phase{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}==1) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"update_phase\",\"$1\",\"phase\",\"(.*)\"))) or on (job,instance,environment,host,service_name) (label_replace((up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}*0+1),\"update_phase\",\"Unknown\",\"instance\",\".*\")))) * on (job,instance,environment,host,service_name) group_left(last_error) ((max by (job,instance,environment,host,service_name,last_error) (label_join(((ts_funnel_update_last_error_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"last_error\",\" / \",\"code\",\"phase\"))) or on (job,instance,environment,host,service_name) (label_replace((up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"}*0+1),\"last_error\",\"None\",\"instance\",\".*\")))),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "max by (target) (label_join(((ts_funnel_auto_update_enabled{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "max by (target) (label_join(((ts_funnel_update_last_success_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "D",
+          "expr": "max by (target) (label_join(((ts_funnel_update_last_attempt_finish_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "E",
+          "expr": "max by (target) (label_join(((ts_funnel_update_last_attempt_had_errors{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "F",
+          "expr": "max by (target) (label_join(((ts_funnel_funnel_reachable{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "G",
+          "expr": "max by (target) (label_join(((time()-(ts_funnel_funnel_last_probe_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",component=\"$component\"}>0)) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\"} == 1)),\"target\",\" | \",\"job\",\"instance\",\"environment\",\"host\",\"service_name\"))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Unknown",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^Time.*$"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Health"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Healthy",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "Updating",
+                        "color": "blue",
+                        "index": 1
+                      },
+                      "2": {
+                        "text": "Degraded",
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "3": {
+                        "text": "Unreachable",
+                        "color": "red",
+                        "index": 3
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last successful update"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Never",
+                        "color": "text",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last attempt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Never",
+                        "color": "text",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Auto-update"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No",
+                        "color": "text",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "Yes",
+                        "color": "text",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors in attempt"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No",
+                        "color": "text",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "Yes",
+                        "color": "text",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Funnel probe"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No",
+                        "color": "text",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "Yes",
+                        "color": "text",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Probe age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Service"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Inspect this service",
+                    "url": "/d/ts-funnel-services/tailscale-funnel-services?${__url_time_range}&${datasource:queryparam}&${job:queryparam}&${environment:queryparam}&${host:queryparam}&${component:queryparam}&var-service=${__data.fields[\"Service\"]:percentencode}&var-instance=${__data.fields[\"Instance\"]:percentencode}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "noValue",
+                "value": "Name not configured — see Instance"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Health",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "description": "One row per target. Scrape-unreachable targets remain visible. Health is local daemon readiness; Funnel result and probe age are shown separately. Full error messages are in docker logs and updates.log.",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "target",
+            "mode": "outerTabular"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "target": true,
+              "job": true,
+              "host": true
+            },
+            "indexByName": {
+              "service_name": 0,
+              "instance": 1,
+              "environment": 2,
+              "Value #A": 3,
+              "current_version": 4,
+              "previous_version": 5,
+              "Value #B": 6,
+              "update_phase": 7,
+              "last_result": 8,
+              "Value #C": 9,
+              "Value #D": 10,
+              "Value #E": 11,
+              "last_error": 12,
+              "Value #F": 13,
+              "Value #G": 14
+            },
+            "renameByName": {
+              "service_name": "Service",
+              "instance": "Instance",
+              "environment": "Environment",
+              "Value #A": "Health",
+              "current_version": "Current",
+              "previous_version": "Previous",
+              "Value #B": "Auto-update",
+              "update_phase": "Phase",
+              "last_result": "Last result",
+              "Value #C": "Last successful update",
+              "Value #D": "Last attempt",
+              "Value #E": "Errors in attempt",
+              "last_error": "Last error",
+              "Value #F": "Funnel probe",
+              "Value #G": "Probe age"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Selected service: $service",
+      "type": "row",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 1
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 8,
+      "title": "Current version",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\",role=\"current\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{version}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 9,
+      "title": "Committed version",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\",role=\"committed\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{version}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 10,
+      "title": "Previous version",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\",role=\"previous\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{version}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 11,
+      "title": "Candidate version",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 16,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_component_version_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\",role=\"candidate\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{version}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 12,
+      "title": "Last attempt result",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_result{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}==1) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{result}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 13,
+      "title": "Current phase",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 20,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_phase{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}==1) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{phase}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 14,
+      "title": "Automatic updates",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_auto_update_enabled{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Disabled",
+                  "color": "text",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Enabled",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 15,
+      "title": "Errors during last attempt",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 20,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_attempt_had_errors{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "No errors",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Errors recorded",
+                  "color": "orange",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 16,
+      "title": "Last successful update",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_success_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Never",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 17,
+      "title": "Last attempt started",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_attempt_start_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Never",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 18,
+      "title": "Last attempt finished",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_attempt_finish_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Never",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 19,
+      "title": "Last successful check",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 24,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_successful_check_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Never",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 20,
+      "title": "Latest attempt duration",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_attempt_duration_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 21,
+      "title": "Latest interruption estimate",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 28,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_attempt_interruption_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 22,
+      "title": "Candidate quarantined",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_candidate_quarantined{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "No",
+                  "color": "text",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Yes",
+                  "color": "orange",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 23,
+      "title": "Rollback copy available",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 28,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_rollback_available{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "No",
+                  "color": "text",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Yes",
+                  "color": "orange",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "title": "Last recorded error category",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_error_info{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}} · {{code}} / {{phase}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "None",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "name",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 25,
+      "title": "Last error time",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_last_error_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}*1000) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "noValue": "Never",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Never",
+                  "color": "text",
+                  "index": 0
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 26,
+      "title": "Readiness and public-path observations",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"}",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} · metrics",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "ts_funnel_component_ready{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} · local ready",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "ts_funnel_funnel_reachable{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} · public probe",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bool",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "title": "Update outcomes over time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(ts_funnel_update_attempts_total{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}[$__rate_interval])",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} · {{result}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "title": "Update errors over time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 43,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(ts_funnel_update_errors_total{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}[$__rate_interval])",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} · {{phase}} / {{code}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "title": "Metadata check age",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-((ts_funnel_update_last_successful_check_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}>0) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1))",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 30,
+      "title": "Public probe age",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 50,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-((ts_funnel_funnel_last_probe_timestamp_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}>0) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1))",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 31,
+      "title": "Normal check interval",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 50,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(ts_funnel_update_check_interval_seconds{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\",component=\"$component\"}) and on (job,instance,environment,host,service_name) (up{job=~\"$job\",environment=~\"$environment\",host=~\"$host\",service_name=~\"$service\",instance=~\"$instance\"} == 1)",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{instance}}",
+          "editorMode": "code",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "N/A",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "wideLayout": true,
+        "orientation": "auto"
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}
