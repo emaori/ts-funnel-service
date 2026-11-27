@@ -37,6 +37,9 @@ func Run(ctx context.Context, c config.Config, build observability.Build) (runEr
 		}
 	}()
 	defer os.Remove(readyFile)
+	if err := os.Remove(readyFile); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clear stale readiness marker: %w", err)
+	}
 	log.Printf("component=supervisor starting service=%s auto_update_enabled=%t", c.Hostname, c.AutoUpdate)
 	state, err := store.Load()
 	if os.IsNotExist(err) {
