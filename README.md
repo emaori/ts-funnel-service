@@ -9,6 +9,8 @@ No need for a public IP or router port-forwarding. SSL certificates are automati
 
 The image is **rootless** and runs Tailscale in [userspace networking](https://tailscale.com/kb/1112/userspace-networking) mode: no `NET_ADMIN` capability, no `/dev/net/tun` device, and no root user are required. It also works out of the box on rootless Docker and Podman.
 
+See [how ts-funnel-service works](docs/overview.md) for the request flow and a brief architecture overview.
+
 ## Automatic updates and monitoring
 
 Tailscale updates automatically by default inside the running container. The supervisor verifies signed stable artifacts, stages the inactive A/B slot and briefly restarts Tailscale while Caddy and metrics stay running. Failed handovers attempt rollback to the outgoing executable and untouched state. Existing public connections may be lost.
