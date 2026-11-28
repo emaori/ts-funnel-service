@@ -1,0 +1,1 @@
+These public Ed25519 trust roots and BSD license are copied from tailscale.com v1.104.1, clientupdate/distsign/roots. They are public verification keys, not credentials. Root updates require an image rebuild; network-delivered keys are accepted only when signed by these roots.

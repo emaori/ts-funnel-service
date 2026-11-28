@@ -1,0 +1,6 @@
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
+WORKDIR /test
+RUN npm init -y && npm install --save-exact playwright@1.65.1
+COPY tests/dashboard_browser.cjs ./dashboard_browser.cjs
+USER pwuser
+CMD ["node","dashboard_browser.cjs"]

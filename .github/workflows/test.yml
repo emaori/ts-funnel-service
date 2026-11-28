@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: python3 tools/generate_dashboard.py --check
+
+  native:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - name: Build native test image
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load -f tests/Dockerfile.native -t ts-funnel-native-test .
+      - name: Exercise real unprivileged binaries
+        run: docker run --rm --platform linux/${{ matrix.arch }} ts-funnel-native-test
+      - name: Build application image
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load -t ts-funnel-test .
+      - name: Check application executable
+        run: docker run --rm --platform linux/${{ matrix.arch }} ts-funnel-test version
+
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - run: docker buildx build --load -f tests/Dockerfile.observability -t ts-funnel-fixtures .
+      - run: docker buildx build --load -f tests/Dockerfile.browser -t ts-funnel-browser .
+      - name: Import and exercise shared dashboard
+        run: python3 tests/observability_smoke.py --fixture-image ts-funnel-fixtures --browser-image ts-funnel-browser
